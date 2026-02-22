@@ -1,9 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import FarmerDashboard from "./pages/FarmerDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import BuyerDashboard from "./pages/BuyerDashboard";
+import { useEffect } from "react";
+import { LanguageProvider } from "./context/LanguageContext";
+
+import LanguageSelector from "./components/LanguageSelector";
+import Login            from "./pages/Login";
+import Register         from "./pages/Register";
+import Home             from "./pages/HomePage";
+import FarmerDashboard  from "./pages/FarmerDashboard";
+import AdminDashboard   from "./pages/AdminDashboard";
+import BuyerDashboard   from "./pages/BuyerDashboard";
 
 // ── Smart redirect based on role ─────────────────────────────────
 function getRolePath(role) {
@@ -26,48 +31,86 @@ const ProtectedRoute = ({ children, allowedRole }) => {
   return children;
 };
 
+// ── Google Translate Script Injector ─────────────────────────────
+function GoogleTranslateScript() {
+  useEffect(() => {
+    if (document.getElementById("google-translate-script")) return;
+
+    window.googleTranslateElementInit = function () {
+      new window.google.translate.TranslateElement(
+        { pageLanguage: "en", autoDisplay: false },
+        "google_translate_element"
+      );
+    };
+
+    const script     = document.createElement("script");
+    script.id        = "google-translate-script";
+    script.src       = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    script.async     = true;
+    document.body.appendChild(script);
+  }, []);
+
+  return <div id="google_translate_element" style={{ display: "none" }} />;
+}
+
+// ── Root Export ───────────────────────────────────────────────────
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Public */}
-        <Route path="/"         element={<Navigate to="/login" replace />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/login"    element={<Login />} />
+      <LanguageProvider>
+        <GoogleTranslateScript />
+        <Routes>
 
-        {/* Farmer */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute allowedRole="farmer">
-              <FarmerDashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* ✅ NEW: Root always lands on language selector */}
+          <Route path="/"                element={<Navigate to="/select-language" replace />} />
 
-        {/* Buyer */}
-        <Route
-          path="/buyer-dashboard"
-          element={
-            <ProtectedRoute allowedRole="buyer">
-              <BuyerDashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* ✅ NEW: Language selector page — shown every time site opens */}
+          <Route path="/select-language" element={<LanguageSelector />} />
 
-        {/* Admin */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedRole="admin">
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* ✅ NEW: Home page — navigated to after language is selected */}
+          <Route path="/home"            element={<Home />} />
 
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+          {/* ── Your existing public routes (unchanged) ── */}
+          <Route path="/login"           element={<Login />} />
+          <Route path="/register"        element={<Register />} />
+
+          {/* ── Your existing protected routes (unchanged) ── */}
+
+          {/* Farmer */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute allowedRole="farmer">
+                <FarmerDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Buyer */}
+          <Route
+            path="/buyer-dashboard"
+            element={
+              <ProtectedRoute allowedRole="buyer">
+                <BuyerDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ✅ Catch-all → back to language selector */}
+          <Route path="*" element={<Navigate to="/select-language" replace />} />
+
+        </Routes>
+      </LanguageProvider>
     </BrowserRouter>
   );
 }

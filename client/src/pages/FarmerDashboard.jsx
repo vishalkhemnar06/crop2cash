@@ -1,3 +1,5 @@
+//FarmerDashboard.jsx
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { API } from "../api";
@@ -234,6 +236,44 @@ export default function FarmerDashboard() {
   // Map state
   const [mapBuyers, setMapBuyers] = useState([]);
   const [mapBuyersLoading, setMapBuyersLoading] = useState(false);
+  
+  // Settings state (only displayName used here)
+  const [settings, setSettings] = useState({ displayName: localStorage.getItem("fullName") || "" });
+
+  // Inline password reset state (embedded in Settings)
+  const [showResetSection, setShowResetSection] = useState(false);
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetMessage, setResetMessage] = useState(null);
+  const [resetDevToken, setResetDevToken] = useState(null);
+  const [resetTokenInput, setResetTokenInput] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [resetLoadingRequest, setResetLoadingRequest] = useState(false);
+  const [resetLoadingSubmit, setResetLoadingSubmit] = useState(false);
+  // Settings menu / update / delete UI state
+  const [showSettingsMenu, setShowSettingsMenu] = useState(true);
+  const [showUpdateProfile, setShowUpdateProfile] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const saveSettings = () => {
+    (async () => {
+      try {
+        const payload = { fullName: settings.displayName };
+        const res = await API.put("/profile/settings", payload);
+        const updatedUser = res.data.user || {};
+        localStorage.setItem("fullName", updatedUser.fullName || settings.displayName || "");
+        setSettings((s) => ({ ...s, displayName: updatedUser.fullName || s.displayName }));
+        alert("Display name saved.");
+      } catch (err) {
+        // Fallback to localStorage only
+        try {
+          localStorage.setItem("fullName", settings.displayName || "");
+          alert("Saved locally (server unreachable).");
+        } catch (e) {
+          alert("Failed to save display name.");
+        }
+      }
+    })();
+  };
 
   useEffect(() => { fetchDashboardData(); }, []);
 
@@ -242,6 +282,10 @@ export default function FarmerDashboard() {
       setError(null);
       const res = await API.get("/profile/me");
       setUser(res.data.user);
+      // sync display name into local settings state
+      setSettings((s) => ({ ...s, displayName: res.data.user?.fullName || s.displayName }));
+      // sync phone for reset flow
+      setResetPhone(res.data.user?.phoneNumber || "");
       const p = res.data.farmProfile || {};
       setFarmProfile({
         cropType: p.cropType || "", customCropType: p.customCropType || "",
@@ -1727,12 +1771,122 @@ export default function FarmerDashboard() {
 
       {/* SETTINGS */}
       {activeTab === "settings" && (
-        <div className="text-center p-10 text-gray-500">
-          <h2 className="text-xl font-bold">Settings</h2>
-          <p>Coming soon...</p>
+        <div className="max-w-2xl mx-auto space-y-6">
+              <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">Settings</h2>
+                </div>
+
+                {showSettingsMenu && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">Choose an action:</p>
+                    <div className="flex gap-3">
+                      <button onClick={() => { setShowUpdateProfile(true); setShowSettingsMenu(false); }} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl">Update Profile</button>
+                      <button onClick={() => { setShowDeleteConfirm(true); setShowSettingsMenu(false); }} className="bg-red-600 text-white px-5 py-2.5 rounded-xl">Delete Account</button>
+                    </div>
+                  </div>
+                )}
+
+                {showUpdateProfile && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-500">Update your profile (mobile number cannot be changed).</p>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Full Name</label>
+                      <input value={settings.displayName} onChange={(e) => setSettings({ ...settings, displayName: e.target.value })} className="w-full p-3 border rounded-lg bg-gray-50" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm text-gray-500">State</label>
+                        <input value={user?.location?.state || ""} onChange={(e) => setUser(u => ({ ...u, location: { ...u.location, state: e.target.value } }))} className="w-full p-3 border rounded-lg" />
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-500">District</label>
+                        <input value={user?.location?.district || ""} onChange={(e) => setUser(u => ({ ...u, location: { ...u.location, district: e.target.value } }))} className="w-full p-3 border rounded-lg" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-500">Local Address</label>
+                      <input value={user?.location?.localAddress || ""} onChange={(e) => setUser(u => ({ ...u, location: { ...u.location, localAddress: e.target.value } }))} className="w-full p-3 border rounded-lg" />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-500">Pincode</label>
+                      <input value={user?.location?.pincode || ""} onChange={(e) => setUser(u => ({ ...u, location: { ...u.location, pincode: e.target.value } }))} className="w-full p-3 border rounded-lg" />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <input id="resetPwdOpt" type="checkbox" checked={showResetSection} onChange={(e) => setShowResetSection(e.target.checked)} className="accent-green-600" />
+                      <label htmlFor="resetPwdOpt" className="text-sm text-gray-700">Reset password (optional)</label>
+                    </div>
+
+                    {showResetSection && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-sm text-gray-500">New Password</label>
+                          <input type="password" value={resetNewPassword} onChange={(e) => setResetNewPassword(e.target.value)} className="w-full p-3 border rounded-lg" />
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-500">Confirm Password</label>
+                          <input type="password" value={resetConfirmPassword} onChange={(e) => setResetConfirmPassword(e.target.value)} className="w-full p-3 border rounded-lg" />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3 mt-3">
+                      <button onClick={async () => {
+                        // prepare payload and call update endpoint
+                        const payload = {
+                          phoneNumber: user?.phoneNumber,
+                          fullName: settings.displayName,
+                          state: user?.location?.state,
+                          district: user?.location?.district,
+                          localAddress: user?.location?.localAddress,
+                          pincode: user?.location?.pincode,
+                        };
+                        if (showResetSection) {
+                          payload.newPassword = resetNewPassword;
+                          payload.confirmPassword = resetConfirmPassword;
+                        }
+                        try {
+                          const res = await API.put('/profile/update', payload);
+                          const updated = res.data.user || {};
+                          localStorage.setItem('fullName', updated.fullName || settings.displayName || '');
+                          setSettings(s => ({ ...s, displayName: updated.fullName || s.displayName }));
+                          alert('Profile updated');
+                          setShowUpdateProfile(false); setShowSettingsMenu(true); setShowResetSection(false);
+                        } catch (err) {
+                          alert(err.response?.data?.message || 'Update failed');
+                        }
+                      }} className="bg-green-600 text-white px-4 py-2 rounded-lg">Save Profile</button>
+                      <button onClick={() => { setShowUpdateProfile(false); setShowSettingsMenu(true); setShowResetSection(false); }} className="px-4 py-2 rounded-lg bg-gray-100">Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {showDeleteConfirm && (
+                  <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-lg">
+                    <p className="text-sm text-red-700 font-semibold">Are you sure you want to delete your account? This action is irreversible.</p>
+                    <div className="flex gap-3 mt-3">
+                      <button onClick={async () => {
+                        if (!window.confirm('Delete account? This cannot be undone.')) return;
+                        try {
+                          await API.delete('/profile/delete', { data: { phoneNumber: user?.phoneNumber } });
+                          // clear local session and redirect to register
+                          localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('fullName');
+                          alert('Account deleted');
+                          window.location.href = '/register';
+                        } catch (err) {
+                          alert(err.response?.data?.message || 'Delete failed');
+                        }
+                      }} className="bg-red-600 text-white px-4 py-2 rounded-lg">Confirm Delete</button>
+                      <button onClick={() => { setShowDeleteConfirm(false); setShowSettingsMenu(true); }} className="px-4 py-2 rounded-lg bg-gray-100">Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
         </div>
       )}
 
     </DashboardLayout>
   );
 }
+
