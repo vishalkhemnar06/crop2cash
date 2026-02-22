@@ -3,20 +3,24 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import FarmerDashboard from "./pages/FarmerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import BuyerDashboard from "./pages/BuyerDashboard";
 
-// 🔒 Protected Route Component
+// ── Smart redirect based on role ─────────────────────────────────
+function getRolePath(role) {
+  if (role === "admin")  return "/admin";
+  if (role === "buyer")  return "/buyer-dashboard";
+  return "/dashboard";
+}
+
+// ── Protected Route ───────────────────────────────────────────────
 const ProtectedRoute = ({ children, allowedRole }) => {
-  const token = localStorage.getItem("token");
+  const token    = localStorage.getItem("token");
   const userRole = localStorage.getItem("role");
 
-  // Not logged in
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!token) return <Navigate to="/login" replace />;
 
-  // ✅ FIX: Wrong role → redirect to their correct dashboard, not back to login
   if (allowedRole && userRole !== allowedRole) {
-    return <Navigate to={userRole === "admin" ? "/admin" : "/dashboard"} replace />;
+    return <Navigate to={getRolePath(userRole)} replace />;
   }
 
   return children;
@@ -26,12 +30,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        {/* Public */}
+        <Route path="/"         element={<Navigate to="/login" replace />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login"    element={<Login />} />
 
-        {/* 👨‍🌾 Farmer Routes */}
+        {/* Farmer */}
         <Route
           path="/dashboard"
           element={
@@ -41,7 +45,17 @@ export default function App() {
           }
         />
 
-        {/* 👮 Admin Routes */}
+        {/* Buyer */}
+        <Route
+          path="/buyer-dashboard"
+          element={
+            <ProtectedRoute allowedRole="buyer">
+              <BuyerDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin */}
         <Route
           path="/admin"
           element={
