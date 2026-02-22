@@ -1,15 +1,16 @@
 {
-  "name": "server",
+  "name": "crop2cash-server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "description": "Crop2Cash Backend - Express + MongoDB + GROQ",
+  "main": "server.js",
   "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["express", "mongodb", "mern", "crop2cash"],
+  "author": "Vishal Khemnar",
+  "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
